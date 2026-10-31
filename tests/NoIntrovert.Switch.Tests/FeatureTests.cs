@@ -135,6 +135,39 @@ public sealed class FeatureTests : IDisposable
         Assert.Equal(0x20000u, plan.DisplayVersion);
     }
 
+    [Fact]
+    public void Planner_warns_when_two_inputs_hold_different_dlc_with_the_same_id_and_version()
+    {
+        using var a = SwitchPackage.Open(Nsp("a.nsp", TestTitles.Base(), TestTitles.Dlc(seed: 3)), TestKeys.Create());
+        using var b = SwitchPackage.Open(Nsp("b.nsp", TestTitles.Dlc(seed: 4)), TestKeys.Create());
+        var plan = Assert.Single(MergePlanner.Plan([a, b]));
+
+        var dlc = Assert.Single(plan.Dlc);
+        Assert.Same(a, dlc.Package); // first input wins the tie
+        var warning = Assert.Single(plan.Warnings, w => w.Contains("different contents"));
+        Assert.Contains("'a.nsp'", warning);
+        Assert.Contains("'b.nsp'", warning);
+    }
+
+    [Fact]
+    public void Planner_stays_quiet_when_the_same_dlc_is_given_twice()
+    {
+        using var a = SwitchPackage.Open(Nsp("a.nsp", TestTitles.Base(), TestTitles.Dlc()), TestKeys.Create());
+        using var b = SwitchPackage.Open(Nsp("b.nsp", TestTitles.Dlc()), TestKeys.Create());
+        var plan = Assert.Single(MergePlanner.Plan([a, b]));
+        Assert.Single(plan.Dlc);
+        Assert.DoesNotContain(plan.Warnings, w => w.Contains("different contents"));
+    }
+
+    [Fact]
+    public async Task Merge_reports_the_conflict_in_the_output_warnings()
+    {
+        var a = Nsp("a.nsp", TestTitles.Base(), TestTitles.Dlc(seed: 3));
+        var b = Nsp("b.nsp", TestTitles.Dlc(seed: 4));
+        var output = Assert.Single((await _converter.MergeAsync([a, b], Path.Combine(_dir, "merged"), Fast(OutputFormat.Nsp))).Outputs);
+        Assert.Contains(output.Warnings, w => w.Contains("different contents"));
+    }
+
     // ------------------------------------------------------------- game card output
 
     [Theory]
@@ -217,6 +250,16 @@ public sealed class FeatureTests : IDisposable
         var report = await _converter.SplitAsync([input], Path.Combine(_dir, "split-broken"), Fast(OutputFormat.Nsp));
         Assert.Single(report.Outputs);
         Assert.Contains(report.Skipped, s => s.Contains("missing 1 content file"));
+    }
+
+    [Fact]
+    public async Task Split_reports_a_second_title_with_the_same_id_and_version_but_different_contents()
+    {
+        var a = Nsp("a.nsp", TestTitles.Dlc(seed: 3));
+        var b = Nsp("b.nsp", TestTitles.Dlc(seed: 4));
+        var report = await _converter.SplitAsync([a, b], Path.Combine(_dir, "split-conflict"), Fast(OutputFormat.Nsp));
+        Assert.Single(report.Outputs);
+        Assert.Contains(report.Skipped, s => s.Contains("different contents") && s.Contains("'b.nsp'"));
     }
 
     [Fact]

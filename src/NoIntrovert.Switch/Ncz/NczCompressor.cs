@@ -3,12 +3,16 @@ using System.Buffers.Binary;
 using NoIntrovert.Switch.IO;
 using NoIntrovert.Switch.Nca;
 using ZstdSharp;
+using ZstdSharp.Unsafe;
 
 namespace NoIntrovert.Switch.Ncz;
 
 public enum NczMode
 {
-    /// <summary>One zstd stream for the whole NCA. Smallest output; single-threaded. The nsz default.</summary>
+    /// <summary>
+    /// One zstd stream for the whole NCA. Smallest output; the nsz default. zstd's own worker threads
+    /// compress it in parallel jobs, still producing a single standard frame.
+    /// </summary>
     Solid,
 
     /// <summary>Independent blocks compressed in parallel. Much faster on multi-core machines.</summary>
@@ -25,7 +29,10 @@ public sealed record NczOptions
     /// <summary>Block size as a power of two (block mode only). 20 = 1 MiB.</summary>
     public int BlockSizeExponent { get; init; } = 20;
 
-    /// <summary>Parallelism for block mode. Defaults to the processor count.</summary>
+    /// <summary>
+    /// Threads used for compression: parallel blocks in block mode, zstd workers in solid mode.
+    /// Defaults to the processor count; 1 compresses solid mode on the calling thread.
+    /// </summary>
     public int MaxDegreeOfParallelism { get; init; } = Environment.ProcessorCount;
 }
 
@@ -101,7 +108,7 @@ public static class NczCompressor
         var remaining = nca.Length - NczFormat.UncompressedHeaderSize;
 
         if (options.Mode == NczMode.Solid)
-            await CompressSolidAsync(nca, output, crypto, remaining, options.Level, onSourceChunk, progress, ct).ConfigureAwait(false);
+            await CompressSolidAsync(nca, output, crypto, remaining, options.Level, options.MaxDegreeOfParallelism, onSourceChunk, progress, ct).ConfigureAwait(false);
         else
             await CompressBlocksAsync(nca, output, crypto, remaining, options, onSourceChunk, progress, ct).ConfigureAwait(false);
 
@@ -109,13 +116,15 @@ public static class NczCompressor
     }
 
     private static async Task CompressSolidAsync(
-        Stream nca, Stream output, NczSectionCrypto crypto, long remaining, int level,
+        Stream nca, Stream output, NczSectionCrypto crypto, long remaining, int level, int workers,
         Action<ReadOnlyMemory<byte>>? onSourceChunk, Action<long>? progress, CancellationToken ct)
     {
         var buffer = ArrayPool<byte>.Shared.Rent(ChunkSize);
         try
         {
             await using var zstd = new CompressionStream(new NonClosingStream(output), level);
+            if (workers > 1)
+                zstd.SetParameter(ZSTD_cParameter.ZSTD_c_nbWorkers, workers);
             long position = NczFormat.UncompressedHeaderSize;
             while (remaining > 0)
             {

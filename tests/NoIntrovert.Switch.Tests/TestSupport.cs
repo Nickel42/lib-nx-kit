@@ -285,9 +285,10 @@ internal static class TestTitles
         return title with { Files = files };
     }
 
-    public static TestTitle Dlc()
+    /// <param name="seed">Changes the DLC's data (not its ID or version), as a differently dumped copy would.</param>
+    public static TestTitle Dlc(int seed = 3)
     {
-        var data = TestNca.BuildProgram(Det.Compressible(0x40000, 3), Det.Bytes("dlc-data", 16), DlcId,
+        var data = TestNca.BuildProgram(Det.Compressible(0x40000, seed), Det.Bytes("dlc-data", 16), DlcId,
             type: TestContentType.PublicData);
         var cnmt = TestNca.BuildCnmt(DlcId, 0, 0x82, BaseId, [(data, 2)]);
         return Assemble(DlcId, cnmt, data, [data]);

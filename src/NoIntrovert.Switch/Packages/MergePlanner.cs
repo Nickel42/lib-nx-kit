@@ -73,19 +73,17 @@ public static class MergePlanner
             }
 
             var bases = usable.Where(t => t.Type == ContentMetaType.Application).ToList();
-            var baseTitle = bases.OrderByDescending(t => t.Version).FirstOrDefault();
+            var baseTitle = PickNewest(bases, warnings);
             if (baseTitle is null)
                 warnings.Add("No base game found; output will contain only the update and/or DLC.");
             else if (bases.Select(b => b.Version).Distinct().Count() > 1)
                 warnings.Add($"Several base game versions found; using v{baseTitle.Version}.");
 
-            var update = usable.Where(t => t.Type == ContentMetaType.Patch)
-                .OrderByDescending(t => t.Version)
-                .FirstOrDefault();
+            var update = PickNewest(usable.Where(t => t.Type == ContentMetaType.Patch), warnings);
 
             var dlc = usable.Where(t => t.Type == ContentMetaType.AddOnContent)
                 .GroupBy(t => t.TitleId)
-                .Select(g => g.OrderByDescending(t => t.Version).First())
+                .Select(g => PickNewest(g, warnings)!)
                 .OrderBy(t => t.TitleId)
                 .ToList();
 
@@ -99,6 +97,30 @@ public static class MergePlanner
         }
         return plans;
     }
+
+    /// <summary>
+    /// The highest version among <paramref name="candidates"/> (the first input wins a tie). Warns when another
+    /// input holds a different title under the same ID and version, since only one of them can be kept.
+    /// </summary>
+    private static PackageTitle? PickNewest(IEnumerable<PackageTitle> candidates, List<string> warnings)
+    {
+        var ordered = candidates.OrderByDescending(t => t.Version).ToList();
+        if (ordered.Count == 0)
+            return null;
+
+        var chosen = ordered[0];
+        foreach (var other in ordered.Skip(1).TakeWhile(t => t.Version == chosen.Version))
+        {
+            if (!SameContents(chosen, other))
+                warnings.Add($"{chosen} appears in '{Path.GetFileName(chosen.Package.Path)}' and '{Path.GetFileName(other.Package.Path)}' "
+                             + $"with different contents; using '{Path.GetFileName(chosen.Package.Path)}'. One of the dumps may be mislabelled.");
+        }
+        return chosen;
+    }
+
+    /// <summary>True when two titles list the same content IDs (the same dump, possibly in different containers).</summary>
+    internal static bool SameContents(PackageTitle a, PackageTitle b)
+        => a.Meta.Contents.Select(c => c.ContentIdHex).Order().SequenceEqual(b.Meta.Contents.Select(c => c.ContentIdHex).Order());
 
     /// <summary>Content files (other than optional delta fragments) a title's CNMT lists but its package lacks.</summary>
     public static int MissingContentCount(PackageTitle title)

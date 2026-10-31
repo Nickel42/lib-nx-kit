@@ -98,13 +98,19 @@ public sealed class SwitchConverter
                 .Where(t => t.Type is ContentMetaType.Application or ContentMetaType.Patch or ContentMetaType.AddOnContent)
                 .OrderBy(t => t.ApplicationId).ThenBy(t => t.Type).ThenBy(t => t.TitleId).ThenBy(t => t.Version);
 
-            var written = new HashSet<(ulong, uint)>();
+            var written = new Dictionary<(ulong, uint), PackageTitle>();
             foreach (var title in titles)
             {
                 ct.ThrowIfCancellationRequested();
 
-                if (written.Contains((title.TitleId, title.Version)))
-                    continue; // same title and version already written from another input
+                if (written.TryGetValue((title.TitleId, title.Version), out var first))
+                {
+                    // Same title and version already written from another input; only a concern if it differs.
+                    if (!MergePlanner.SameContents(first, title))
+                        skipped.Add($"{title} in '{Path.GetFileName(title.Package.Path)}' has the same ID and version as the copy in "
+                                    + $"'{Path.GetFileName(first.Package.Path)}' but different contents; only the first was written.");
+                    continue;
+                }
 
                 var missing = MergePlanner.MissingContentCount(title);
                 if (missing > 0)
@@ -115,7 +121,7 @@ public sealed class SwitchConverter
                         skipped.Add($"{title} in '{Path.GetFileName(title.Package.Path)}' is missing {missing} content file(s).");
                     continue;
                 }
-                written.Add((title.TitleId, title.Version));
+                written.Add((title.TitleId, title.Version), title);
 
                 var path = Path.Combine(outputDirectory,
                     TitleFileName(title, names.GetValueOrDefault(title.ApplicationId), options.Format));

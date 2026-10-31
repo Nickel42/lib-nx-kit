@@ -15,7 +15,8 @@ Every input format converts to every output format: NSP, NSZ, XCI and XCZ in, NS
 - **Update deltas:** dropped by default (`IncludeDeltaFragments`).
 - **Verification:** each NCA's SHA-256 is checked against its CNMT record while writing (`Verify`, on by default). A failed check deletes the partial output.
 - **XCI → NSP:** game-card NCA headers are switched to the "download" distribution type so the console will install them (`ConvertGameCardToDownload`).
-- **NSZ:** solid mode (the nsz default; smallest output, single-threaded) and block mode (parallel, much faster).
+- **NSZ:** solid mode (the nsz default; smallest output) and block mode (independent blocks, fastest). Both use `MaxDegreeOfParallelism` threads: solid mode through zstd's worker threads, which still write one standard zstd frame.
+- **Merge conflicts:** when two inputs hold the same title ID and version with different contents (e.g. a mislabelled DLC dump), the first input is used and the plan carries a warning naming both files. `SplitAsync` reports the second copy under `Skipped`.
 - **Writing:** output streams straight to a `.part` file with no temp copies, and is renamed when complete. Progress reporting and cancellation are supported throughout.
 
 **Verification of converted content:** an NCA converted from title-key crypto (for an XCI) legitimately no longer matches its CNMT hash. When verification fails, the writer re-reads that one file and rebuilds candidate original headers: rights ID restored, key area cleared, and either distribution type. If one matches, the file passes with a note, so the library's own NSP → XCI → NSP → NSZ chains verify fully. This only costs time on the rare mismatch path. If a tool changed a header in a way that can't be rebuilt, a Download-type NCA inside a game card gets a warning. Anything else is reported as corrupt.

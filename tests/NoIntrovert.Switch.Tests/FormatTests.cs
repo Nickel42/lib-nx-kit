@@ -61,9 +61,10 @@ public class FormatTests
     }
 
     [Theory]
-    [InlineData(NczMode.Solid)]
-    [InlineData(NczMode.Block)]
-    public async Task Ncz_compress_then_decompress_restores_identical_nca(NczMode mode)
+    [InlineData(NczMode.Solid, 1)] // solid, compressed on the calling thread
+    [InlineData(NczMode.Solid, 4)] // solid, zstd worker threads
+    [InlineData(NczMode.Block, 4)]
+    public async Task Ncz_compress_then_decompress_restores_identical_nca(NczMode mode, int threads)
     {
         var keys = TestKeys.Create();
         var nca = TestNca.BuildProgram(Det.Compressible(0x250000), Det.Bytes("content-key", 16), 0x0100BBBB00000000);
@@ -71,7 +72,7 @@ public class FormatTests
         using var source = new MemoryStream(nca);
         var reader = new NcaReader(source, keys);
         using var ncz = new MemoryStream();
-        var options = new NczOptions { Level = 3, Mode = mode, BlockSizeExponent = 16, MaxDegreeOfParallelism = 4 };
+        var options = new NczOptions { Level = 3, Mode = mode, BlockSizeExponent = 16, MaxDegreeOfParallelism = threads };
         await NczCompressor.CompressAsync(source, reader, ncz, options);
 
         Assert.True(ncz.Length < nca.Length / 4, $"expected real compression, got {ncz.Length} of {nca.Length}");

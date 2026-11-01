@@ -1,10 +1,10 @@
 using Android.App;
 using Android.OS;
 using Android.Widget;
-using NspXciLibrary;
-using NspXciLibrary.Keys;
-using NspXciLibrary.Ncz;
-using NspXciLibrary.Packages;
+using LibNxKit;
+using LibNxKit.Keys;
+using LibNxKit.Ncz;
+using LibNxKit.Packages;
 
 namespace AndroidSmoke;
 

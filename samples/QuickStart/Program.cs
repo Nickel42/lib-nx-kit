@@ -1,9 +1,9 @@
 // The examples from the README, as a program CI compiles on every change.
 // usage: QuickStart <prod.keys> <output-folder> <nsp|nsz|xci|xcz> <input>... [--title-keys <title.keys>]
-using NspXciLibrary;
-using NspXciLibrary.Keys;
-using NspXciLibrary.Ncz;
-using NspXciLibrary.Packages;
+using LibNxKit;
+using LibNxKit.Keys;
+using LibNxKit.Ncz;
+using LibNxKit.Packages;
 
 if (args.Length < 4)
 {

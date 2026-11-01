@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>lib-nx-kit</AssemblyName>
+    <PackageId>lib-nx-kit</PackageId>
+    <RootNamespace>LibNxKit</RootNamespace>
+    <Description>Read, convert, merge, split and compress Nintendo Switch content packages: NSP, NSZ, XCI and XCZ in any direction, split-file inputs, base + update + DLC merging, and NCA hash verification. Pure managed; bring your own keys.</Description>
+    <PackageTags>nintendo-switch;switch;nsp;nsz;xci;xcz;nca;ncz;zstd;rom;convert</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Pure managed zstd (MIT). Used for NCZ compression/decompression. -->
+    <PackageReference Include="ZstdSharp.Port" Version="0.8.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="lib-nx-kit.Tests" />
+  </ItemGroup>
+
+</Project>

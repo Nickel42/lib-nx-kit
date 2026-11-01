@@ -4,7 +4,7 @@
     <TargetFramework>net8.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
-    <!-- In your own project: <PackageReference Include="nsp-xci-library" Version="0.1.0" /> -->
-    <ProjectReference Include="..\..\src\nsp-xci-library\nsp-xci-library.csproj" />
+    <!-- In your own project: <PackageReference Include="lib-nx-kit" Version="0.1.0" /> -->
+    <ProjectReference Include="..\..\src\lib-nx-kit\lib-nx-kit.csproj" />
   </ItemGroup>
 </Project>

@@ -31,9 +31,9 @@ jobs:
       - name: Version from tag
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
       - name: Test
-        run: dotnet test nsp-xci-library.sln -c Release
+        run: dotnet test lib-nx-kit.sln -c Release
       - name: Pack
-        run: dotnet pack nsp-xci-library.sln -c Release -o artifacts -p:Version=${VERSION:-0.0.0-dev}
+        run: dotnet pack lib-nx-kit.sln -c Release -o artifacts -p:Version=${VERSION:-0.0.0-dev}
       - uses: actions/upload-artifact@v4
         with:
           name: packages

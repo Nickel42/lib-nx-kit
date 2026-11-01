@@ -1,11 +1,11 @@
-# nsp-xci-library
+# lib-nx-kit
 
 A C# library for reading, converting, merging, splitting and compressing Nintendo Switch content packages in any .NET app. Every format converts to every other: NSP, NSZ, XCI and XCZ in and out, including split-file inputs. Base games, updates and DLC merge into one file per game. Every NCA is checked against its metadata hash while writing. The only dependency is ZstdSharp.Port (pure managed zstd, MIT). No native code, no keys bundled.
 
-[![CI](https://github.com/Nickel42/nsp-xci-library/actions/workflows/ci.yml/badge.svg)](https://github.com/Nickel42/nsp-xci-library/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/Nickel42/nsp-xci-library/blob/main/LICENSE)
+[![CI](https://github.com/Nickel42/lib-nx-kit/actions/workflows/ci.yml/badge.svg)](https://github.com/Nickel42/lib-nx-kit/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/Nickel42/lib-nx-kit/blob/main/LICENSE)
 
-Package: **nsp-xci-library** (namespace `NspXciLibrary`).
+Package: **lib-nx-kit** (namespace `LibNxKit`).
 
 ## Platforms
 
@@ -24,10 +24,10 @@ Any app on .NET 8 or later can use it, including `net8.0-android`, `net9.0-ios` 
 ## Install
 
 ```bash
-dotnet add package nsp-xci-library
+dotnet add package lib-nx-kit
 ```
 
-Until a release reaches nuget.org, reference `src/nsp-xci-library` directly or use the package attached to a [GitHub release](https://github.com/Nickel42/nsp-xci-library/releases).
+Until a release reaches nuget.org, reference `src/lib-nx-kit` directly or use the package attached to a [GitHub release](https://github.com/Nickel42/lib-nx-kit/releases).
 
 ## What it does
 
@@ -55,13 +55,13 @@ The library ships no keys. Users supply their own `prod.keys` (and optionally `t
 
 ## Quick start
 
-These snippets come from [`samples/QuickStart`](https://github.com/Nickel42/nsp-xci-library/tree/main/samples/QuickStart), which CI compiles on every change.
+These snippets come from [`samples/QuickStart`](https://github.com/Nickel42/lib-nx-kit/tree/main/samples/QuickStart), which CI compiles on every change.
 
 ```csharp
-using NspXciLibrary;
-using NspXciLibrary.Keys;
-using NspXciLibrary.Ncz;
-using NspXciLibrary.Packages;
+using LibNxKit;
+using LibNxKit.Keys;
+using LibNxKit.Ncz;
+using LibNxKit.Packages;
 
 var keys = KeySet.Load(prodKeysPath, titleKeysPath);   // titleKeysPath may be null
 var converter = new SwitchConverter(keys);
@@ -98,12 +98,12 @@ foreach (var p in packages) p.Dispose();
 
 - **Threads:** run long operations off the UI thread (`Task.Run`). In WPF, WinForms, Avalonia or MAUI, create `Progress<T>` on the UI thread, so reports arrive there.
 - **Memory:** everything streams; there are no temporary copies of whole files.
-- **Android and iOS:** the APIs take file paths. Files picked through the Storage Access Framework (Android) or document picker (iOS) arrive as streams or content URIs; copy them into your app's storage first. See [`samples/AndroidSmoke`](https://github.com/Nickel42/nsp-xci-library/tree/main/samples/AndroidSmoke), which loads `prod.keys` from the app's files folder.
+- **Android and iOS:** the APIs take file paths. Files picked through the Storage Access Framework (Android) or document picker (iOS) arrive as streams or content URIs; copy them into your app's storage first. See [`samples/AndroidSmoke`](https://github.com/Nickel42/lib-nx-kit/tree/main/samples/AndroidSmoke), which loads `prod.keys` from the app's files folder.
 
 ## Layout
 
 ```
-src/nsp-xci-library/
+src/lib-nx-kit/
   Keys/        KeySet (prod.keys / title.keys, key derivation)
   Crypto/      Nintendo AES-XTS (NCA headers), AES-CTR (NCA bodies), ECB helpers
   IO/          SubStream, decrypting stream, copy helpers
@@ -114,7 +114,7 @@ src/nsp-xci-library/
   Packages/    SwitchPackage (open any format), MergePlanner, PackageWriter
   SwitchConverter.cs   high-level facade
 tests/
-  nsp-xci-library.Tests/   xUnit; builds synthetic NCAs with fake keys, no real content needed
+  lib-nx-kit.Tests/        xUnit; builds synthetic NCAs with fake keys, no real content needed
   vectors.py               independent reference for the crypto test vectors
 samples/
   QuickStart/              the code above, as a program
@@ -133,7 +133,7 @@ dotnet pack -c Release -o artifacts
 
 The tests don't need real keys or games. They build structurally valid NCAs encrypted with fake keys, then exercise everything end to end: header decryption, key-area decryption, section reads, NCZ in both modes, NSP → NSZ → NSP byte for byte, merges, splits and failed verification. The XTS and CTR vectors come from an independent implementation (`tests/vectors.py`).
 
-[docs/TESTING.md](https://github.com/Nickel42/nsp-xci-library/blob/main/docs/TESTING.md) has the real-dump checklist, what has been checked so far, and the open questions. Releases are described in [CONTRIBUTING.md](https://github.com/Nickel42/nsp-xci-library/blob/main/CONTRIBUTING.md).
+[docs/TESTING.md](https://github.com/Nickel42/lib-nx-kit/blob/main/docs/TESTING.md) has the real-dump checklist, what has been checked so far, and the open questions. Releases are described in [CONTRIBUTING.md](https://github.com/Nickel42/lib-nx-kit/blob/main/CONTRIBUTING.md).
 
 ## Legal
 
@@ -141,4 +141,4 @@ This library is for working with content you dumped from hardware and software y
 
 ## License
 
-[MIT](https://github.com/Nickel42/nsp-xci-library/blob/main/LICENSE) © 2026 Nickel42. The one dependency, [ZstdSharp.Port](https://github.com/oleg-st/ZstdSharp), is also MIT-licensed.
+[MIT](https://github.com/Nickel42/lib-nx-kit/blob/main/LICENSE) © 2026 Nickel42. The one dependency, [ZstdSharp.Port](https://github.com/oleg-st/ZstdSharp), is also MIT-licensed.

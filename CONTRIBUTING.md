@@ -31,4 +31,4 @@ dotnet build samples/AndroidSmoke -c Release
    git push origin v0.1.0
    ```
 3. The **Release** workflow tests and packs the library with that version and creates a GitHub release with the packages attached.
-4. If the repository has a `NUGET_API_KEY` secret (an API key from nuget.org scoped to `nsp-xci-library`), the workflow also pushes the package to nuget.org.
+4. If the repository has a `NUGET_API_KEY` secret (an API key from nuget.org scoped to `lib-nx-kit`), the workflow also pushes the package to nuget.org.

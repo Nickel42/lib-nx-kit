@@ -16,6 +16,6 @@
     <WarningsAsErrors>$(WarningsAsErrors);IL2026;IL2046;IL2057;IL2072;IL2075;IL2087;IL2091;IL3050;IL3051</WarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\nsp-xci-library\nsp-xci-library.csproj" />
+    <ProjectReference Include="..\..\src\lib-nx-kit\lib-nx-kit.csproj" />
   </ItemGroup>
 </Project>

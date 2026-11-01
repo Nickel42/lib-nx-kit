@@ -2,6 +2,10 @@
 
 All notable changes are listed here. Versions follow [Semantic Versioning](https://semver.org/); while the version is 0.x, minor versions may change the API.
 
+## Unreleased
+
+- **Renamed** the repository and the NuGet package from `nsp-xci-library` to `lib-nx-kit` (assembly `lib-nx-kit`; the namespace is now `LibNxKit`).
+
 ## 0.1.0
 
 First release as a standalone library.

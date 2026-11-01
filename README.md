@@ -111,3 +111,7 @@ Before shipping, also test against real dumps:
 - **Real nsz files:** test reading an nsz-made NCZ whose first section starts below 0x4000, to confirm nsz's stream layout matches ours there.
 
 NSZ output compresses only Program and PublicData NCAs, like nsz. Control, manual and meta NCAs, and any NCA whose key is unavailable, are stored as-is (the latter with a warning).
+
+## License
+
+[MIT](LICENSE) © 2026 Nickel42. The one dependency, [ZstdSharp.Port](https://github.com/oleg-st/ZstdSharp), is also MIT-licensed.

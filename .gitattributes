@@ -1,0 +1,8 @@
+# Normalise line endings in text files; check out with the platform's native endings.
+* text=auto
+*.nsp    binary
+*.nsz    binary
+*.xci    binary
+*.xcz    binary
+*.nupkg  binary
+*.snupkg binary

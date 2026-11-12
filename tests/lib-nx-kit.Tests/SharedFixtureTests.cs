@@ -1,4 +1,3 @@
-using System.Runtime.CompilerServices;
 using LibNxKit.Keys;
 using LibNxKit.Packages;
 using Xunit;
@@ -12,8 +11,17 @@ namespace LibNxKit.Tests;
 /// </summary>
 public sealed class SharedFixtureTests
 {
-    private static string FixturesDir([CallerFilePath] string source = "") =>
-        Path.Combine(Path.GetDirectoryName(source)!, "..", "fixtures");
+    /// <summary>
+    /// <c>tests/fixtures</c> in the repository, found from the test's output folder upwards. (Not [CallerFilePath]:
+    /// CI builds map source paths to <c>/_/</c>, so that path doesn't exist there.)
+    /// </summary>
+    private static string FixturesDir()
+    {
+        for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
+            if (File.Exists(Path.Combine(dir.FullName, "lib-nx-kit.sln")))
+                return Path.Combine(dir.FullName, "tests", "fixtures");
+        throw new DirectoryNotFoundException($"lib-nx-kit.sln isn't above {AppContext.BaseDirectory}");
+    }
 
     private static string FakeProdKeys() =>
         "# Made-up keys for the synthetic test packages in this folder. They open nothing real.\n"

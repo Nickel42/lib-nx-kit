@@ -22,6 +22,10 @@ public static class Pfs0
         return BinaryPrimitives.ReadUInt32LittleEndian(head) == Magic;
     }
 
+    /// <summary>The string table size (padding included) in the header of the PFS0 at <paramref name="offset"/>.</summary>
+    public static int ReadStringTableSize(Stream stream, long offset = 0) =>
+        BinaryPrimitives.ReadInt32LittleEndian(StreamUtil.ReadAt(stream, offset + 8, 4));
+
     /// <summary>Reads the entry table of a PFS0 that starts at <paramref name="offset"/>.</summary>
     public static IReadOnlyList<PartitionEntry> Read(Stream stream, long offset = 0)
     {
@@ -52,23 +56,30 @@ public static class Pfs0
 
     /// <summary>
     /// Builds a PFS0 header for files laid out back to back in the given order. The string table
-    /// is padded so file data begins on a 0x20-byte boundary.
+    /// is padded so file data begins on a 0x20-byte boundary, or to <paramref name="stringTableSize"/> when that's
+    /// given and the names fit (to keep another writer's header as it was).
     /// </summary>
-    public static byte[] BuildHeader(IReadOnlyList<(string Name, long Size)> files)
+    public static byte[] BuildHeader(IReadOnlyList<(string Name, long Size)> files, int? stringTableSize = null)
     {
         var nameBytes = files.Select(f => Encoding.UTF8.GetBytes(f.Name)).ToList();
         var rawStringTable = nameBytes.Sum(n => n.Length + 1);
         var unpadded = HeaderSize + files.Count * EntrySize + rawStringTable;
-        var headerSize = (int)StreamUtil.AlignUp(unpadded, 0x20);
-        if (headerSize == unpadded)
-            headerSize += 0x20; // always leave some padding, as common tools do
-        var stringTableSize = headerSize - HeaderSize - files.Count * EntrySize;
+        int headerSize;
+        if (stringTableSize is { } kept && kept >= rawStringTable)
+            headerSize = HeaderSize + files.Count * EntrySize + kept;
+        else
+        {
+            headerSize = (int)StreamUtil.AlignUp(unpadded, 0x20);
+            if (headerSize == unpadded)
+                headerSize += 0x20; // always leave some padding, as common tools do
+        }
+        stringTableSize = headerSize - HeaderSize - files.Count * EntrySize;
 
         var header = new byte[headerSize];
         var span = header.AsSpan();
         BinaryPrimitives.WriteUInt32LittleEndian(span, Magic);
         BinaryPrimitives.WriteInt32LittleEndian(span[4..], files.Count);
-        BinaryPrimitives.WriteInt32LittleEndian(span[8..], stringTableSize);
+        BinaryPrimitives.WriteInt32LittleEndian(span[8..], stringTableSize.Value);
 
         long dataOffset = 0;
         var nameOffset = 0;

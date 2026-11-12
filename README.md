@@ -40,6 +40,7 @@ Inputs can be NSP, NSZ, XCI or XCZ files, or split files: `*.ns0`/`*.xc0` parts,
 - **NSZ/XCZ:** solid mode (the nsz default; smallest output) and block mode (independent blocks, fastest). Both use `MaxDegreeOfParallelism` threads: solid mode through zstd's worker threads, which still write one standard zstd frame. Only Program and PublicData NCAs are compressed, like nsz. Control, manual and meta NCAs, and any NCA whose key is unavailable, are stored as-is (the latter with a warning).
 - **XCI/XCZ output:** title-key (rights-ID) NCAs are converted to standard crypto, with the title key moved into the key area. Game cards carry no tickets. The card header's RSA signature and encrypted card-info block are left zeroed, because they can't be produced without Nintendo's keys. Emulators and installers accept this; a real console's game-card reader would not.
 - **XCI → NSP:** game-card NCA headers are switched to the "download" distribution type so the console will install them (`ConvertGameCardToDownload`). XCI output keeps each NCA's distribution type as it was.
+- **Source layout:** files are written in the order they have in their source package (`KeepSourceLayout`, on by default). When one NSP or NSZ becomes an NSP or NSZ, its header's padding is kept too, so an NSP compressed to NSZ and decompressed again is the original file byte for byte.
 - **Update deltas:** dropped by default (`IncludeDeltaFragments`).
 - **Verification:** each NCA's SHA-256 is checked against its CNMT record while writing (`Verify`, on by default). A failed check deletes the partial output.
 - **Merge conflicts:** when two inputs hold the same title ID and version with different contents (e.g. a mislabelled DLC dump), the first input is used and the plan carries a warning naming both files. `SplitAsync` reports the second copy under `Skipped`.
@@ -52,6 +53,12 @@ Inputs can be NSP, NSZ, XCI or XCZ files, or split files: `*.ns0`/`*.xc0` parts,
 ## Keys
 
 The library ships no keys. Users supply their own `prod.keys` (and optionally `title.keys`), dumped from their own console with Lockpick_RCM. `KeySet` derives `titlekek_XX` and `key_area_key_*_XX` from `master_key_XX` when the file has the sources but not the derived keys. A missing key throws `MissingKeyException`, whose `KeyName` says which one.
+
+`KeyLocator` finds them where Switch tools keep them, so an app needs no key setting unless the user wants one. It looks in each location you pass first (a `prod.keys` file, or a folder holding one), then in Ryujinx's `system` folder and the `keys` folders of yuzu, Eden, Citron, Sudachi and Suyu (on Windows, macOS and Linux), `~/.switch`, and `keys/` beside the executable. `LoadDefault` loads the first `prod.keys` it finds, with the `title.keys` beside it:
+
+```csharp
+KeySet? keys = KeyLocator.LoadDefault(out var foundAt, extraLocations: [mySettingsPath]);
+```
 
 ## Quick start
 

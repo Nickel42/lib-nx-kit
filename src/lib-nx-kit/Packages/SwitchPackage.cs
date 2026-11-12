@@ -99,6 +99,9 @@ public sealed class SwitchPackage : IDisposable
     /// <summary>All files in the package (PFS0 root for NSP/NSZ, secure partition for XCI/XCZ).</summary>
     public IReadOnlyList<PartitionEntry> Files { get; }
 
+    /// <summary>For an NSP or NSZ: the size of its PFS0 header's string table, padding included (writers differ in how much they pad).</summary>
+    internal int? RootStringTableSize => Format is PackageFormat.Nsp or PackageFormat.Nsz ? Pfs0.ReadStringTableSize(_stream) : null;
+
     /// <summary>Tickets keyed by rights ID (upper-case hex).</summary>
     public IReadOnlyDictionary<string, PackageTicket> Tickets { get; }
 

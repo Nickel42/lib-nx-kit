@@ -49,6 +49,14 @@ public sealed record WriteOptions
     /// type so the console will install them. The NCA body is unchanged.
     /// </summary>
     public bool ConvertGameCardToDownload { get; init; } = true;
+
+    /// <summary>
+    /// Write the files in the order they have in their source package (packages in input order), and, when one
+    /// NSP or NSZ becomes an NSP or NSZ with the same files, keep its header's padding too. An NSP compressed to
+    /// NSZ and decompressed again is then the original file byte for byte. When false, each title's files are
+    /// written meta first, then its contents, then its tickets.
+    /// </summary>
+    public bool KeepSourceLayout { get; init; } = true;
 }
 
 public readonly record struct WriteProgress(long BytesDone, long BytesTotal, string CurrentFile)
@@ -96,6 +104,8 @@ public sealed class PackageWriter
         var items = BuildItems(titleList, options, warnings);
         if (items.Count == 0)
             throw new InvalidOperationException("Nothing to write.");
+        if (options.KeepSourceLayout)
+            items = InSourceOrder(items, titleList);
 
         var tracker = new ProgressTracker(items.Sum(i => i.EstimatedSize), progress);
         var tempPath = outputPath + ".part";
@@ -133,7 +143,8 @@ public sealed class PackageWriter
         ProgressTracker tracker, List<string> warnings, CancellationToken ct)
     {
         // Header length depends only on file names, so a placeholder can be patched in place later.
-        var placeholder = Pfs0.BuildHeader(items.Select(i => (i.OutputName, 0L)).ToList());
+        var stringTable = options.KeepSourceLayout ? SourceStringTableSize(items) : null;
+        var placeholder = Pfs0.BuildHeader(items.Select(i => (i.OutputName, 0L)).ToList(), stringTable);
         await output.WriteAsync(placeholder, ct).ConfigureAwait(false);
 
         var sizes = new long[items.Count];
@@ -144,7 +155,7 @@ public sealed class PackageWriter
             sizes[i] = output.Position - start;
         }
 
-        var header = Pfs0.BuildHeader(items.Select((it, idx) => (it.OutputName, sizes[idx])).ToList());
+        var header = Pfs0.BuildHeader(items.Select((it, idx) => (it.OutputName, sizes[idx])).ToList(), stringTable);
         if (header.Length != placeholder.Length)
             throw new InvalidOperationException("PFS0 header size changed unexpectedly.");
         output.Position = 0;
@@ -222,6 +233,29 @@ public sealed class PackageWriter
     }
 
     // ---------------------------------------------------------------- planning
+
+    /// <summary>The items in the order their files have in the source packages; packages in the order their titles were given.</summary>
+    private static List<Item> InSourceOrder(List<Item> items, IReadOnlyList<PackageTitle> titles)
+    {
+        var packages = titles.Select(t => t.Package).Distinct().ToList();
+        return items.Select((item, index) => (item, index))
+            .OrderBy(x => packages.IndexOf(x.item.Package))
+            .ThenBy(x => x.item.Source.Offset)
+            .ThenBy(x => x.index)
+            .Select(x => x.item)
+            .ToList();
+    }
+
+    /// <summary>
+    /// The string table size of the source's PFS0 header, when every item comes from one NSP or NSZ holding exactly
+    /// these files: NCA and NCZ names are the same length, so its padding fits the output and the header comes out
+    /// as it was. Null otherwise (the usual padding is used).
+    /// </summary>
+    private static int? SourceStringTableSize(List<Item> items)
+    {
+        var package = items[0].Package;
+        return items.All(i => i.Package == package) && package.Files.Count == items.Count ? package.RootStringTableSize : null;
+    }
 
     private List<Item> BuildItems(IReadOnlyList<PackageTitle> titles, WriteOptions options, List<string> warnings)
     {

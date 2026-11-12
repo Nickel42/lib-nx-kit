@@ -4,6 +4,7 @@ All notable changes are listed here. Versions follow [Semantic Versioning](https
 
 ## Unreleased
 
+- **ZstdSharp.Port 0.8.6** (was 0.8.1), the version lib-wii-u-kit and lib-3ds-kit use, so an app using them together gets one zstd. No API changes.
 - **Renamed** the repository and the NuGet package from `nsp-xci-library` to `lib-nx-kit` (assembly `lib-nx-kit`; the namespace is now `LibNxKit`).
 
 ## 0.1.0

@@ -6,3 +6,6 @@
 *.xcz    binary
 *.nupkg  binary
 *.snupkg binary
+
+# Test fixtures are compared byte for byte.
+tests/fixtures/** -text

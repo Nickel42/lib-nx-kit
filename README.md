@@ -53,6 +53,12 @@ Inputs can be NSP, NSZ, XCI or XCZ files, or split files: `*.ns0`/`*.xc0` parts,
 
 The library ships no keys. Users supply their own `prod.keys` (and optionally `title.keys`), dumped from their own console with Lockpick_RCM. `KeySet` derives `titlekek_XX` and `key_area_key_*_XX` from `master_key_XX` when the file has the sources but not the derived keys. A missing key throws `MissingKeyException`, whose `KeyName` says which one.
 
+`KeyLocator` finds them where Switch tools keep them, so an app needs no key setting unless the user wants one. It looks in each location you pass first (a `prod.keys` file, or a folder holding one), then in Ryujinx's `system` folder and the `keys` folders of yuzu, Eden, Citron, Sudachi and Suyu (on Windows, macOS and Linux), `~/.switch`, and `keys/` beside the executable. `LoadDefault` loads the first `prod.keys` it finds, with the `title.keys` beside it:
+
+```csharp
+KeySet? keys = KeyLocator.LoadDefault(out var foundAt, extraLocations: [mySettingsPath]);
+```
+
 ## Quick start
 
 These snippets come from [`samples/QuickStart`](https://github.com/Nickel42/lib-nx-kit/tree/main/samples/QuickStart), which CI compiles on every change.

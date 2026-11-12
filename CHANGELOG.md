@@ -4,6 +4,8 @@ All notable changes are listed here. Versions follow [Semantic Versioning](https
 
 ## Unreleased
 
+- **`KeyLocator`** finds `prod.keys` (and `title.keys` beside it) in Ryujinx's and the yuzu family's folders, `~/.switch` and `keys/` beside the executable, after any locations you pass.
+- **Shared test fixtures** in `tests/fixtures/`: a synthetic base-game NSP, an update NSP with its ticket, and the fake `prod.keys` that opens them, for apps to test against. A test checks they still equal what the test helpers make.
 - **ZstdSharp.Port 0.8.6** (was 0.8.1), the version lib-wii-u-kit and lib-3ds-kit use, so an app using them together gets one zstd. No API changes.
 - **Renamed** the repository and the NuGet package from `nsp-xci-library` to `lib-nx-kit` (assembly `lib-nx-kit`; the namespace is now `LibNxKit`).
 

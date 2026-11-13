@@ -9,6 +9,8 @@ dotnet test
 
 The tests run against both library targets (net8.0 and net10.0); CI runs them on Windows, Linux and macOS and builds the Android sample. They build synthetic NCAs encrypted with fake keys, so they need no real keys or games. The crypto vectors come from an independent Python implementation, `tests/vectors.py` (needs `pip install cryptography`).
 
+`ConversionMatrixTests` converts a base game + update (with ticket) + DLC from every source (NSP, NSZ, XCI, XCZ, and a cartridge dump with GameCard NCAs as XCI or XCZ) to every output format, then checks the output's format, titles and CNMTs, tickets, NCA headers (rights IDs, distribution type) and that every NCA still decrypts to the original data. It also covers block-mode NCZ, byte-identical round trips, round trips through a game card, and chains through all four formats.
+
 ## 2. Real-dump checklist
 
 1. **Round trip:** NSP → NSZ → NSP, and compare the files inside with the original.

@@ -82,7 +82,7 @@ internal static class TestNca
 
     /// <summary>A Control NCA whose RomFS (behind a fake IVFC header) holds a control.nacp.</summary>
     public static byte[] BuildControl(string gameName, string displayVersion, ulong titleId, byte[] contentKey,
-        byte[]? rightsId = null)
+        byte[]? rightsId = null, byte distribution = 0)
     {
         var nacp = new byte[0x4000];
         Encoding.UTF8.GetBytes(gameName).CopyTo(nacp, 0x0);          // AmericanEnglish name
@@ -123,7 +123,7 @@ internal static class TestNca
         BinaryPrimitives.WriteInt64LittleEndian(level6[8..], romfs.Length);
         BinaryPrimitives.WriteInt32LittleEndian(level6[0x10..], 14);
 
-        return Build(section, contentKey, titleId, TestContentType.Control, fsType: 0, hashType: 3, ivfc, 0, rightsId);
+        return Build(section, contentKey, titleId, TestContentType.Control, fsType: 0, hashType: 3, ivfc, distribution, rightsId);
     }
 
     private static byte[] Build(byte[] sectionData, byte[] contentKey, ulong programId, TestContentType contentType,
@@ -260,12 +260,13 @@ internal static class TestTitles
     public const ulong UpdateId = BaseId | 0x800;
     public const ulong DlcId = BaseId + 0x1001;
 
-    public static TestTitle Base(string name = "Test Game")
+    /// <param name="distribution">1 (GameCard) for a title as a cartridge holds it; 0 (Download) as the eShop sells it.</param>
+    public static TestTitle Base(string name = "Test Game", byte distribution = 0)
     {
-        var program = TestNca.BuildProgram(Det.Compressible(0x60000, 1), Det.Bytes("base-program", 16), BaseId);
-        var control = TestNca.BuildControl(name, "1.0.0", BaseId, Det.Bytes("base-control", 16));
+        var program = TestNca.BuildProgram(Det.Compressible(0x60000, 1), Det.Bytes("base-program", 16), BaseId, distribution);
+        var control = TestNca.BuildControl(name, "1.0.0", BaseId, Det.Bytes("base-control", 16), distribution: distribution);
         var cnmt = TestNca.BuildCnmt(BaseId, 0, 0x80, UpdateId, [(program, 1), (control, 3)]);
-        return Assemble(BaseId, cnmt, program, [program, control]);
+        return Assemble(BaseId, cnmt, program, [program, control], distribution);
     }
 
     /// <summary>An update whose NCAs use title-key crypto, shipped with its ticket and certificate.</summary>
@@ -286,17 +287,18 @@ internal static class TestTitles
     }
 
     /// <param name="seed">Changes the DLC's data (not its ID or version), as a differently dumped copy would.</param>
-    public static TestTitle Dlc(int seed = 3)
+    /// <param name="distribution">1 (GameCard) for DLC as a cartridge holds it; 0 (Download) as the eShop sells it.</param>
+    public static TestTitle Dlc(int seed = 3, byte distribution = 0)
     {
-        var data = TestNca.BuildProgram(Det.Compressible(0x40000, seed), Det.Bytes("dlc-data", 16), DlcId,
+        var data = TestNca.BuildProgram(Det.Compressible(0x40000, seed), Det.Bytes("dlc-data", 16), DlcId, distribution,
             type: TestContentType.PublicData);
         var cnmt = TestNca.BuildCnmt(DlcId, 0, 0x82, BaseId, [(data, 2)]);
-        return Assemble(DlcId, cnmt, data, [data]);
+        return Assemble(DlcId, cnmt, data, [data], distribution);
     }
 
-    private static TestTitle Assemble(ulong titleId, byte[] cnmt, byte[] main, IReadOnlyList<byte[]> ncas)
+    private static TestTitle Assemble(ulong titleId, byte[] cnmt, byte[] main, IReadOnlyList<byte[]> ncas, byte distribution = 0)
     {
-        var meta = TestNca.BuildMeta(cnmt, titleId, Det.Bytes($"meta-{titleId:x16}-{cnmt.Length}-{cnmt[8]}", 16));
+        var meta = TestNca.BuildMeta(cnmt, titleId, Det.Bytes($"meta-{titleId:x16}-{cnmt.Length}-{cnmt[8]}", 16), distribution);
         var files = ncas.Select(n => (TestNca.ContentIdHex(n) + ".nca", n)).ToList();
         files.Add((TestNca.ContentIdHex(meta) + ".cnmt.nca", meta));
         return new TestTitle(titleId, files, main);

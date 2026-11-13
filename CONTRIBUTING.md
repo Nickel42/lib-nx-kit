@@ -31,4 +31,16 @@ dotnet build samples/AndroidSmoke -c Release
    git push origin v0.1.0
    ```
 3. The **Release** workflow tests and packs the library with that version and creates a GitHub release with the packages attached.
-4. If the repository has a `NUGET_API_KEY` secret (an API key from nuget.org scoped to `lib-nx-kit`), the workflow also pushes the package to nuget.org.
+4. If the repository has a `NUGET_USER` variable, the workflow also pushes the package to nuget.org with [Trusted Publishing](https://learn.microsoft.com/nuget/nuget-org/trusted-publishing): GitHub issues a short-lived OIDC token and nuget.org exchanges it for an API key that lasts an hour. No API key is stored in the repository.
+
+### Setting up nuget.org publishing (once)
+
+1. On nuget.org, open your user menu → **Trusted Publishing** and add a policy:
+   - **Repository Owner:** `Nickel42`
+   - **Repository:** `lib-nx-kit`
+   - **Workflow File:** `release.yml`
+   - **Environment:** `nuget`
+2. In the GitHub repository, set the variable `NUGET_USER` (Settings → Secrets and variables → Actions → Variables) to the nuget.org profile name that owns the policy — the profile name, not the email address.
+3. Optionally, under Settings → Environments → `nuget` (created by the first release run, or create it yourself), limit deployments to tags matching `v*` and add yourself as a required reviewer.
+
+Only the workflow's `nuget` job can request the OIDC token, and nuget.org accepts it only from that workflow file and environment. If an older `NUGET_API_KEY` secret exists, delete it and revoke the key on nuget.org.

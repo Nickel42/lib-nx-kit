@@ -2,6 +2,10 @@
 
 All notable changes are listed here. Versions follow [Semantic Versioning](https://semver.org/); while the version is 0.x, minor versions may change the API.
 
+## Unreleased
+
+- **nuget.org Trusted Publishing:** the release workflow publishes to nuget.org with a short-lived OIDC-issued key instead of a stored `NUGET_API_KEY` secret. Set the `NUGET_USER` repository variable and add a nuget.org policy to turn it on (see CONTRIBUTING.md). Only the `nuget` job can request the token.
+
 ## 0.2.0
 
 - **Conversion tests:** every source (NSP, NSZ, XCI, XCZ, and a cartridge dump as XCI or XCZ) converted to every output format, checking titles, tickets, NCA headers and decrypted data, plus block-mode NCZ, byte-exact round trips and chains through all four formats.

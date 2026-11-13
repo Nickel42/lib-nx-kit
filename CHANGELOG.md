@@ -2,8 +2,9 @@
 
 All notable changes are listed here. Versions follow [Semantic Versioning](https://semver.org/); while the version is 0.x, minor versions may change the API.
 
-## Unreleased
+## 0.2.0
 
+- **Conversion tests:** every source (NSP, NSZ, XCI, XCZ, and a cartridge dump as XCI or XCZ) converted to every output format, checking titles, tickets, NCA headers and decrypted data, plus block-mode NCZ, byte-exact round trips and chains through all four formats.
 - **Exact round trips:** `WriteOptions.KeepSourceLayout` (on by default) writes files in their source package's order, and keeps an NSP's or NSZ's header padding when it becomes an NSP or NSZ with the same files. An NSP compressed to NSZ and back is now the original byte for byte; before, each title was written meta first, so the file order (and the file's hash) could change. Set it to false for the old order.
 - **`KeyLocator`** finds `prod.keys` (and `title.keys` beside it) in Ryujinx's and the yuzu family's folders, `~/.switch` and `keys/` beside the executable, after any locations you pass.
 - **Shared test fixtures** in `tests/fixtures/`: a synthetic base-game NSP, an update NSP with its ticket, and the fake `prod.keys` that opens them, for apps to test against. A test checks they still equal what the test helpers make.

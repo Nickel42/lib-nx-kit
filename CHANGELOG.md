@@ -2,7 +2,9 @@
 
 All notable changes are listed here. Versions follow [Semantic Versioning](https://semver.org/); while the version is 0.x, minor versions may change the API.
 
-## Unreleased
+## 0.2.1
+
+The first release published to nuget.org. The library is unchanged from 0.2.0.
 
 - **nuget.org Trusted Publishing:** the release workflow publishes to nuget.org with a short-lived OIDC-issued key instead of a stored `NUGET_API_KEY` secret. Set the `NUGET_USER` repository variable and add a nuget.org policy to turn it on (see CONTRIBUTING.md). Only the `nuget` job can request the token.
 

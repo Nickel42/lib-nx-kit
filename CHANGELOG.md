@@ -2,6 +2,10 @@
 
 All notable changes are listed here. Versions follow [Semantic Versioning](https://semver.org/); while the version is 0.x, minor versions may change the API.
 
+## Unreleased
+
+- **Dependency:** ZstdSharp.Port 0.8.6 → 0.8.8 (bug fixes).
+
 ## 0.2.1
 
 The first release published to nuget.org. The library is unchanged from 0.2.0.

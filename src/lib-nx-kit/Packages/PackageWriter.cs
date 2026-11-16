@@ -380,7 +380,10 @@ public sealed class PackageWriter
         var start = output.Position;
         var sourceHeader = item.IsNca ? item.Package.OpenNca(item.Source).Header : null;
 
-        using var sha = item.ExpectedHash is null ? null : new NcaHasher(AlternateGameCardHeader(sourceHeader));
+        // With more than one thread, hash and write each chunk while the next is read or decoded, and run
+        // the two SHA-256s side by side. The bytes and their order are the same either way.
+        var parallel = options.Ncz.MaxDegreeOfParallelism > 1;
+        using var sha = item.ExpectedHash is null ? null : new NcaHasher(AlternateGameCardHeader(sourceHeader), parallel: parallel);
         Action<ReadOnlyMemory<byte>>? hashChunk = sha is null ? null : new Action<ReadOnlyMemory<byte>>(sha.Append);
         Action<long> report = n => tracker.Advance(n, item.OutputName);
 
@@ -390,13 +393,14 @@ public sealed class PackageWriter
             {
                 case ItemKind.Copy:
                     source.Position = 0;
-                    await StreamUtil.CopyAsync(source, output, source.Length, hashChunk, report, ct).ConfigureAwait(false);
+                    await StreamUtil.CopyAsync(source, output, source.Length, hashChunk, report, ct, overlap: parallel)
+                        .ConfigureAwait(false);
                     break;
 
                 case ItemKind.Decompress:
                     source.Position = 0;
-                    await NczDecompressor.DecompressAsync(source, output, sourceHeader!.ContentSize, hashChunk, report, ct)
-                        .ConfigureAwait(false);
+                    await NczDecompressor.DecompressAsync(source, output, sourceHeader!.ContentSize, hashChunk, report,
+                        overlap: parallel, ct).ConfigureAwait(false);
                     break;
 
                 case ItemKind.Compress:
@@ -560,16 +564,22 @@ public sealed class PackageWriter
     }
 
     /// <summary>SHA-256 over an NCA as it streams, optionally also over a variant with a substituted header.</summary>
-    private sealed class NcaHasher : IDisposable
+    internal sealed class NcaHasher : IDisposable
     {
+        // Below this a chunk is hashed faster than a second thread can be handed it.
+        private const int ParallelThreshold = 256 * 1024;
+
         private readonly IncrementalHash? _primary;
         private readonly IncrementalHash? _alternate;
         private readonly byte[]? _alternateHeader;
+        private readonly bool _parallel;
         private long _position;
 
         /// <param name="alternateOnly">Skip the hash of the bytes as-is (used when re-checking candidates).</param>
-        public NcaHasher(byte[]? alternateHeader, bool alternateOnly = false)
+        /// <param name="parallel">Run the two hashes of a large chunk on two threads.</param>
+        public NcaHasher(byte[]? alternateHeader, bool alternateOnly = false, bool parallel = false)
         {
+            _parallel = parallel;
             if (!alternateOnly)
                 _primary = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
             _alternateHeader = alternateHeader;
@@ -579,17 +589,24 @@ public sealed class PackageWriter
 
         public void Append(ReadOnlyMemory<byte> chunk)
         {
-            var span = chunk.Span;
-            _primary?.AppendData(span);
-
-            if (_alternate is not null)
+            if (_parallel && _primary is not null && _alternate is not null && chunk.Length >= ParallelThreshold)
+                Parallel.Invoke(() => _primary.AppendData(chunk.Span), () => AppendAlternate(chunk.Span));
+            else
             {
-                var headerLeft = (int)Math.Max(0, Math.Min(_alternateHeader!.Length - _position, span.Length));
-                if (headerLeft > 0)
-                    _alternate.AppendData(_alternateHeader.AsSpan((int)_position, headerLeft));
-                _alternate.AppendData(span[headerLeft..]);
+                _primary?.AppendData(chunk.Span);
+                AppendAlternate(chunk.Span);
             }
-            _position += span.Length;
+            _position += chunk.Length;
+        }
+
+        private void AppendAlternate(ReadOnlySpan<byte> span)
+        {
+            if (_alternate is null)
+                return;
+            var headerLeft = (int)Math.Max(0, Math.Min(_alternateHeader!.Length - _position, span.Length));
+            if (headerLeft > 0)
+                _alternate.AppendData(_alternateHeader.AsSpan((int)_position, headerLeft));
+            _alternate.AppendData(span[headerLeft..]);
         }
 
         public bool Matches(byte[] expected)

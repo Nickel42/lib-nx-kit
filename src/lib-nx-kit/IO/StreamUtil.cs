@@ -1,4 +1,3 @@
-using System.Buffers;
 using System.Text;
 
 namespace LibNxKit.IO;
@@ -26,7 +25,8 @@ internal static class StreamUtil
 
     /// <summary>
     /// Copies exactly <paramref name="length"/> bytes, invoking <paramref name="onChunk"/> with each
-    /// chunk (for hashing) and <paramref name="progress"/> with the byte count.
+    /// chunk (for hashing) and <paramref name="progress"/> with the byte count. With
+    /// <paramref name="overlap"/>, each chunk is hashed and written while the next one is read.
     /// </summary>
     public static async Task CopyAsync(
         Stream source,
@@ -34,31 +34,24 @@ internal static class StreamUtil
         long length,
         Action<ReadOnlyMemory<byte>>? onChunk,
         Action<long>? progress,
-        CancellationToken ct)
+        CancellationToken ct,
+        bool overlap = false)
     {
-        var buffer = ArrayPool<byte>.Shared.Rent(CopyBufferSize);
-        try
+        await using var writer = new OverlappedChunkWriter(destination, CopyBufferSize, onChunk, progress, overlap, ct);
+        var remaining = length;
+        while (remaining > 0)
         {
-            var remaining = length;
-            while (remaining > 0)
-            {
-                ct.ThrowIfCancellationRequested();
-                var want = (int)Math.Min(buffer.Length, remaining);
-                var read = await source.ReadAsync(buffer.AsMemory(0, want), ct).ConfigureAwait(false);
-                if (read == 0)
-                    throw new EndOfStreamException($"Source ended with {remaining} bytes still expected.");
+            ct.ThrowIfCancellationRequested();
+            var buffer = writer.Buffer;
+            var want = (int)Math.Min(CopyBufferSize, remaining);
+            var read = await source.ReadAsync(buffer.AsMemory(0, want), ct).ConfigureAwait(false);
+            if (read == 0)
+                throw new EndOfStreamException($"Source ended with {remaining} bytes still expected.");
 
-                var chunk = buffer.AsMemory(0, read);
-                onChunk?.Invoke(chunk);
-                await destination.WriteAsync(chunk, ct).ConfigureAwait(false);
-                remaining -= read;
-                progress?.Invoke(read);
-            }
+            await writer.SubmitAsync(read).ConfigureAwait(false);
+            remaining -= read;
         }
-        finally
-        {
-            ArrayPool<byte>.Shared.Return(buffer);
-        }
+        await writer.FlushAsync().ConfigureAwait(false);
     }
 
     public static long AlignUp(long value, long alignment) => (value + alignment - 1) / alignment * alignment;

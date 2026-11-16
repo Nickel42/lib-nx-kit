@@ -1,4 +1,6 @@
 using System.Buffers.Binary;
+using System.Numerics;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 
 namespace LibNxKit.Crypto;
@@ -29,6 +31,10 @@ internal sealed class AesCtrCipher : IDisposable
         _aes = Aes.Create();
         _aes.Key = key.ToArray();
         counter[..8].CopyTo(_nonce);
+
+        // The nonce half of every counter block never changes; fill it once.
+        for (var i = 0; i < ChunkBlocks; i++)
+            _nonce.CopyTo(_counters, i * 16);
     }
 
     /// <summary>Encrypts or decrypts <paramref name="data"/> in place.</summary>
@@ -45,25 +51,35 @@ internal sealed class AesCtrCipher : IDisposable
             var blocks = Math.Min(ChunkBlocks, (needed + 15) / 16);
 
             for (var i = 0; i < blocks; i++)
-            {
-                var ctr = _counters.AsSpan(i * 16, 16);
-                _nonce.CopyTo(ctr);
-                BinaryPrimitives.WriteUInt64BigEndian(ctr[8..], block + (ulong)i);
-            }
+                BinaryPrimitives.WriteUInt64BigEndian(_counters.AsSpan(i * 16 + 8, 8), block + (ulong)i);
 
             var bytes = blocks * 16;
             _aes.EncryptEcb(_counters.AsSpan(0, bytes), _keystream.AsSpan(0, bytes), PaddingMode.None);
 
             var usable = Math.Min(bytes - skip, data.Length - done);
             var target = data.Slice(done, usable);
-            var ks = _keystream.AsSpan(skip, usable);
-            for (var i = 0; i < usable; i++)
-                target[i] ^= ks[i];
+            Xor(target, _keystream.AsSpan(skip, usable));
 
             done += usable;
             block += (ulong)blocks;
             skip = 0;
         }
+    }
+
+    /// <summary>target ^= keystream, a vector at a time (the JIT does not vectorize the byte loop).</summary>
+    internal static void Xor(Span<byte> target, ReadOnlySpan<byte> keystream)
+    {
+        var i = 0;
+        if (Vector.IsHardwareAccelerated && target.Length >= Vector<byte>.Count)
+        {
+            var t = MemoryMarshal.Cast<byte, Vector<byte>>(target);
+            var k = MemoryMarshal.Cast<byte, Vector<byte>>(keystream[..target.Length]);
+            for (var v = 0; v < t.Length; v++)
+                t[v] ^= k[v];
+            i = t.Length * Vector<byte>.Count;
+        }
+        for (; i < target.Length; i++)
+            target[i] ^= keystream[i];
     }
 
     public void Dispose() => _aes.Dispose();

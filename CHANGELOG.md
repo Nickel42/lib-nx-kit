@@ -2,8 +2,13 @@
 
 All notable changes are listed here. Versions follow [Semantic Versioning](https://semver.org/); while the version is 0.x, minor versions may change the API.
 
-## Unreleased
+## 0.2.2
 
+Faster NSZ/XCZ → NSP/XCI and NSP ↔ XCI conversions. Output is byte for byte what 0.2.1 wrote.
+
+- **Overlapped hashing and writing:** with `NczOptions.MaxDegreeOfParallelism` above 1 (the default), `PackageWriter` hashes and writes each chunk on a worker while the next one is read or NCZ-decoded, and hashes a Download NCA and its GameCard-header form on two threads. About 1.7–2.7× faster on a 512 MiB synthetic title (in the page cache, 8 threads); with 1 thread the work stays on one thread as before. The public `NczDecompressor.DecompressAsync` is unchanged and still serial.
+- **Faster AES-CTR:** the keystream is XORed a vector at a time instead of a byte at a time.
+- **Fewer, larger reads** when decoding solid NCZ (1 MiB instead of zstd's ~128 KiB), which helps most on network shares.
 - **Dependency:** ZstdSharp.Port 0.8.6 → 0.8.8 (bug fixes).
 
 ## 0.2.1

@@ -54,4 +54,35 @@ public class CryptoTests
 
         Assert.Equal(whole, pieces);
     }
+
+    [Theory]
+    [InlineData(0x4000, 1)]
+    [InlineData(0x4001, 31)]
+    [InlineData(0x400F, 0x10000 + 77)]
+    [InlineData(0x123456789, 0x31337)]
+    public void Ctr_matches_a_block_at_a_time_reference(long offset, int length)
+    {
+        var key = Det.Bytes("ctrkey", 16);
+        var counter = Det.Bytes("ctrnonce", 16);
+        var data = Det.Bytes("ctrref", length);
+        var expected = (byte[])data.Clone();
+
+        // Reference: one ECB block per counter, scalar XOR.
+        using (var aes = Aes.Create())
+        {
+            aes.Key = key;
+            var ctrBlock = new byte[16];
+            for (var i = 0; i < length; i++)
+            {
+                var abs = offset + i;
+                counter.AsSpan(0, 8).CopyTo(ctrBlock);
+                System.Buffers.Binary.BinaryPrimitives.WriteUInt64BigEndian(ctrBlock.AsSpan(8), (ulong)(abs >> 4));
+                expected[i] ^= aes.EncryptEcb(ctrBlock, PaddingMode.None)[abs & 0xF];
+            }
+        }
+
+        using var ctr = new AesCtrCipher(key, counter);
+        ctr.Transform(data, offset);
+        Assert.Equal(expected, data);
+    }
 }

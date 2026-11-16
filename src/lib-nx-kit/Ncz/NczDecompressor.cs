@@ -1,4 +1,3 @@
-using System.Buffers;
 using System.Buffers.Binary;
 using LibNxKit.IO;
 using ZstdSharp;
@@ -10,19 +9,35 @@ public static class NczDecompressor
 {
     private const int ChunkSize = 1024 * 1024;
 
+    // zstd input reads; the default (~128 KiB) means many small reads, which cost most on network shares.
+    private const int InputBufferSize = 1024 * 1024;
+
     /// <summary>
     /// Decompresses <paramref name="ncz"/> (positioned at the NCZ start, readable and seekable)
     /// into <paramref name="output"/>, writing exactly <paramref name="ncaSize"/> bytes.
     /// </summary>
     /// <param name="ncaSize">The original NCA size (the NCA header's content size).</param>
     /// <param name="onChunk">Optional observer of every output chunk (e.g. for SHA-256 verification).</param>
-    public static async Task DecompressAsync(
+    public static Task DecompressAsync(
         Stream ncz,
         Stream output,
         long ncaSize,
         Action<ReadOnlyMemory<byte>>? onChunk = null,
         Action<long>? progress = null,
         CancellationToken ct = default)
+        => DecompressAsync(ncz, output, ncaSize, onChunk, progress, overlap: false, ct);
+
+    /// <param name="overlap">
+    /// Hash and write each chunk on a worker while the next one is decoded (same bytes, same order).
+    /// </param>
+    internal static async Task DecompressAsync(
+        Stream ncz,
+        Stream output,
+        long ncaSize,
+        Action<ReadOnlyMemory<byte>>? onChunk,
+        Action<long>? progress,
+        bool overlap,
+        CancellationToken ct)
     {
         // 1. Raw header region.
         var header = new byte[NczFormat.UncompressedHeaderSize];
@@ -47,41 +62,33 @@ public static class NczDecompressor
 
         if (isBlock)
         {
-            await DecompressBlocksAsync(ncz, output, crypto, position, remaining, onChunk, progress, ct).ConfigureAwait(false);
+            await DecompressBlocksAsync(ncz, output, crypto, position, remaining, onChunk, progress, overlap, ct).ConfigureAwait(false);
             return;
         }
 
-        using var zstd = new DecompressionStream(new NonClosingStream(ncz));
-        var buffer = ArrayPool<byte>.Shared.Rent(ChunkSize);
-        try
+        using var zstd = new DecompressionStream(new NonClosingStream(ncz), bufferSize: InputBufferSize);
+        await using var writer = new OverlappedChunkWriter(output, ChunkSize, onChunk, progress, overlap, ct);
+        while (remaining > 0)
         {
-            while (remaining > 0)
+            ct.ThrowIfCancellationRequested();
+            var buffer = writer.Buffer;
+            var want = (int)Math.Min(ChunkSize, remaining);
+            var got = 0;
+            while (got < want)
             {
-                ct.ThrowIfCancellationRequested();
-                var want = (int)Math.Min(ChunkSize, remaining);
-                var got = 0;
-                while (got < want)
-                {
-                    var n = await zstd.ReadAsync(buffer.AsMemory(got, want - got), ct).ConfigureAwait(false);
-                    if (n == 0)
-                        throw new InvalidDataException($"NCZ stream ended early at NCA offset 0x{position + got:X}.");
-                    got += n;
-                }
-
-                crypto.Apply(buffer.AsSpan(0, want), position);
-                var chunk = buffer.AsMemory(0, want);
-                onChunk?.Invoke(chunk);
-                await output.WriteAsync(chunk, ct).ConfigureAwait(false);
-                progress?.Invoke(want);
-
-                position += want;
-                remaining -= want;
+                var n = await zstd.ReadAsync(buffer.AsMemory(got, want - got), ct).ConfigureAwait(false);
+                if (n == 0)
+                    throw new InvalidDataException($"NCZ stream ended early at NCA offset 0x{position + got:X}.");
+                got += n;
             }
+
+            crypto.Apply(buffer.AsSpan(0, want), position);
+            await writer.SubmitAsync(want).ConfigureAwait(false);
+
+            position += want;
+            remaining -= want;
         }
-        finally
-        {
-            ArrayPool<byte>.Shared.Return(buffer);
-        }
+        await writer.FlushAsync().ConfigureAwait(false);
     }
 
     private static async Task DecompressBlocksAsync(
@@ -92,6 +99,7 @@ public static class NczDecompressor
         long remaining,
         Action<ReadOnlyMemory<byte>>? onChunk,
         Action<long>? progress,
+        bool overlap,
         CancellationToken ct)
     {
         // Block header (after the 8-byte magic): version, type, unused, block size exponent,
@@ -116,11 +124,12 @@ public static class NczDecompressor
 
         using var decompressor = new Decompressor();
         var compressed = new byte[blockSize];
-        var plain = new byte[blockSize];
+        await using var writer = new OverlappedChunkWriter(output, (int)blockSize, onChunk, progress, overlap, ct);
 
         for (var i = 0; i < blockCount; i++)
         {
             ct.ThrowIfCancellationRequested();
+            var plain = writer.Buffer;
             var compressedSize = BinaryPrimitives.ReadInt32LittleEndian(sizesRaw.AsSpan(i * 4));
             var plainSize = (int)Math.Min(blockSize, remaining);
 
@@ -140,15 +149,13 @@ public static class NczDecompressor
             }
 
             crypto.Apply(plain.AsSpan(0, plainSize), position);
-            var chunk = plain.AsMemory(0, plainSize);
-            onChunk?.Invoke(chunk);
-            await output.WriteAsync(chunk, ct).ConfigureAwait(false);
-            progress?.Invoke(plainSize);
+            await writer.SubmitAsync(plainSize).ConfigureAwait(false);
 
             position += plainSize;
             remaining -= plainSize;
         }
 
+        await writer.FlushAsync().ConfigureAwait(false);
         if (remaining != 0)
             throw new InvalidDataException("NCZ block data ended before the full NCA was restored.");
     }

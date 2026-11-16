@@ -380,10 +380,12 @@ public sealed class PackageWriter
         var start = output.Position;
         var sourceHeader = item.IsNca ? item.Package.OpenNca(item.Source).Header : null;
 
-        // With more than one thread, hash and write each chunk while the next is read or decoded, and run
-        // the two SHA-256s side by side. The bytes and their order are the same either way.
+        // With more than one thread, hash and write each chunk while the next is read or decoded; with three
+        // or more, also run the two SHA-256s side by side (that is a third busy thread). The bytes and their
+        // order are the same either way.
         var parallel = options.Ncz.MaxDegreeOfParallelism > 1;
-        using var sha = item.ExpectedHash is null ? null : new NcaHasher(AlternateGameCardHeader(sourceHeader), parallel: parallel);
+        var parallelHash = options.Ncz.MaxDegreeOfParallelism > 2;
+        using var sha = item.ExpectedHash is null ? null : new NcaHasher(AlternateGameCardHeader(sourceHeader), parallel: parallelHash);
         Action<ReadOnlyMemory<byte>>? hashChunk = sha is null ? null : new Action<ReadOnlyMemory<byte>>(sha.Append);
         Action<long> report = n => tracker.Advance(n, item.OutputName);
 
